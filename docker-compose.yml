@@ -1,0 +1,25 @@
+services:
+  ticket-service:
+    build: ./ticket-service
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+
+  support-service:
+    build: ./support-service
+    ports:
+      - "5001:5001"
+
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: tickets_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:
