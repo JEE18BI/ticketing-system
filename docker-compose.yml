@@ -1,25 +1,120 @@
+version: "3.9"
+
 services:
-  ticket-service:
-    build: ./ticket-service
-    ports:
-      - "5000:5000"
-    depends_on:
-      - db
 
-  support-service:
-    build: ./support-service
-    ports:
-      - "5001:5001"
-
+  # ── Database ──────────────────────────────────────────────
   db:
-    image: mysql:8
+    image: mysql:8.0
+    container_name: db
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: tickets_db
     ports:
       - "3306:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ticketing-net
+
+  # ── Message Broker ────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"      # AMQP
+      - "15672:15672"    # Management UI  →  http://localhost:15672  guest/guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ticketing-net
+
+  # ── Ticket Service ────────────────────────────────────────
+  ticket-service:
+    build: ./ticket-service
+    container_name: ticket-service
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ticketing-net
+
+  # ── Support Service ───────────────────────────────────────
+  support-service:
+    build: ./support-service
+    container_name: support-service
+    ports:
+      - "5001:5001"
+    depends_on:
+      - ticket-service
+      - rabbitmq
+    networks:
+      - ticketing-net
+
+  # ── Notification Service ──────────────────────────────────
+  notification-service:
+    build: ./notification-service
+    container_name: notification-service
+    ports:
+      - "5002:5002"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ticketing-net
+
+  # ── Reporting Service ─────────────────────────────────────
+  reporting-service:
+    build: ./reporting-service
+    container_name: reporting-service
+    ports:
+      - "5003:5003"
+    depends_on:
+      - ticket-service
+    networks:
+      - ticketing-net
+
+  # ── Prometheus ────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - ticketing-net
+
+  # ── Grafana ───────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"        # http://localhost:3000  admin/admin
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - ticketing-net
 
 volumes:
-  mysql_data:
+  db_data:
+  grafana_data:
+
+networks:
+  ticketing-net:
+    driver: bridge
