@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="style.css">
+  <title>Ticketing System</title>
+ 
+</head>
+
+<body onload="loadTickets()">
+
+<h1>🎫 Ticketing System</h1>
+
+<h2>Create Ticket</h2>
+<input id="title" placeholder="Enter title">
+<button onclick="createTicket()">Create</button>
+
+<h2>Tickets</h2>
+<div id="tickets"></div>
+
+<script>
+
+const agents = ["Jana", "John", "Alice"];
+
+function getStatusLabel(status) {
+  if (status === "open") return "🟢 Open";
+  if (status === "in_progress") return "🟡 In Progress";
+  if (status === "closed") return "🔴 Closed";
+  return status;
+}
+
+async function createTicket() {
+  const title = document.getElementById("title").value;
+
+  if (!title) {
+    alert("Enter a title");
+    return;
+  }
+
+  await fetch("http://127.0.0.1:5000/create", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({title})
+  });
+
+  document.getElementById("title").value = "";
+  loadTickets();
+}
+
+async function loadTickets() {
+  const res = await fetch("http://127.0.0.1:5001/get-tickets");
+  const data = await res.json();
+
+  const container = document.getElementById("tickets");
+  container.innerHTML = "";
+
+  data.forEach(t => {
+    const div = document.createElement("div");
+    div.className = "ticket";
+
+    let buttons = "";
+ 
+
+
+// Delete (always available)
+buttons += `<button onclick="deleteTicket(${t.id})" style="background:red;">Delete</button>`;
+
+    // 🟢 Assign if not assigned
+    if (!t.assigned_to) {
+      buttons += `
+        <select id="agent-${t.id}">
+          ${agents.map(a => `<option value="${a}">${a}</option>`).join("")}
+        </select>
+        <button onclick="assign(${t.id})">Assign</button>
+      `;
+    }
+
+    // 🟡 Close if assigned and not closed
+    if (t.assigned_to && t.status !== "closed") {
+      buttons += `<button onclick="closeTicket(${t.id})">Close</button>`;
+    }
+
+    div.innerHTML = `
+      <strong>${t.title}</strong><br>
+      Status: ${getStatusLabel(t.status)}<br>
+      Assigned to: ${t.assigned_to || "Unassigned"}<br>
+      ${buttons}
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+async function assign(id) {
+  const agent = document.getElementById(`agent-${id}`).value;
+
+  await fetch(`http://127.0.0.1:5001/assign/${id}`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({agent})
+  });
+
+  loadTickets();
+}
+
+async function closeTicket(id) {
+  await fetch(`http://127.0.0.1:5001/close/${id}`, {
+    method: "PUT"
+  });
+
+  loadTickets();
+}
+async function deleteTicket(id) {
+  if (!confirm("Are you sure you want to delete this ticket?")) return;
+
+  await fetch(`http://127.0.0.1:5001/delete/${id}`, {
+    method: "DELETE"
+  });
+
+  loadTickets();
+}
+
+</script>
+
+</body>
+</html>

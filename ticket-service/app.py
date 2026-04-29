@@ -2,8 +2,10 @@ from flask import Flask, request, jsonify
 import mysql.connector
 import time
 
-app = Flask(__name__)
+from flask_cors import CORS
 
+app = Flask(__name__)
+CORS(app)
 # 🔁 Retry connection until DB is ready
 def get_db_connection():
     for i in range(10):
@@ -121,6 +123,24 @@ def update_ticket(ticket_id):
 
     return jsonify({"message": "Ticket updated"})
 
+
+@app.route("/delete/<int:ticket_id>", methods=["DELETE"])
+def delete_ticket(ticket_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM tickets WHERE id = %s", (ticket_id,))
+    conn.commit()
+
+    if cursor.rowcount == 0:
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "Ticket not found"}), 404
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({"message": "Ticket deleted"})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

@@ -4,6 +4,6 @@ WORKDIR /app
 
 COPY . .
 
-RUN pip install flask mysql-connector-python
+RUN pip install flask mysql-connector-python flask-cors
 
 CMD ["python", "app.py"]

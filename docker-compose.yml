@@ -10,6 +10,14 @@ services:
     build: ./support-service
     ports:
       - "5001:5001"
+    depends_on:
+      - ticket-service
+      - notification-service   # 👈 important
+
+  notification-service:
+    build: ./notification-service
+    ports:
+      - "5002:5002"
 
   db:
     image: mysql:8

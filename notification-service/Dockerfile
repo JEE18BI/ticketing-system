@@ -4,6 +4,6 @@ WORKDIR /app
 
 COPY . .
 
-RUN pip install flask requests flask-cors
+RUN pip install flask flask-cors
 
 CMD ["python", "app.py"]
