@@ -1,0 +1,36 @@
+services:
+  frontend:
+    ports:
+      - "8280:80"
+    volumes:
+      - ./frontend/config.prod.js:/usr/share/nginx/html/config.js:ro
+
+  ticket-service:
+    ports:
+      - "5200:5000"
+    environment:
+      DB_NAME: tickets_prod_db
+      DB_PASSWORD: prod_root_password
+
+  support-service:
+    ports:
+      - "5201:5001"
+
+  notification-service:
+    ports:
+      - "5202:5002"
+
+  reporting-service:
+    ports:
+      - "5203:5003"
+
+  db:
+    environment:
+      MYSQL_DATABASE: tickets_prod_db
+      MYSQL_ROOT_PASSWORD: prod_root_password
+    ports:
+      - "3320:3306"
+
+volumes:
+  mysql_data:
+    name: ticketing-system-prod_mysql_data
