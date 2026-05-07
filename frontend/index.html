@@ -160,6 +160,10 @@ async function loadTickets() {
   const data = await res.json();
 
   const container = document.getElementById("tickets");
+  const selectedAgents = {};
+  document.querySelectorAll("select[id^='agent-']").forEach(select => {
+    selectedAgents[select.id] = select.value;
+  });
   container.innerHTML = "";
 
   data.forEach(t => {
@@ -173,7 +177,11 @@ async function loadTickets() {
     if (!t.assigned_to) {
       buttons += `
         <select id="agent-${t.id}">
-          ${agents.map(a => `<option value="${a}">${a}</option>`).join("")}
+          ${agents.map(a => `
+            <option value="${a}" ${selectedAgents[`agent-${t.id}`] === a ? "selected" : ""}>
+              ${a}
+            </option>
+          `).join("")}
         </select>
         <button class="assign-btn" onclick="assign(${t.id})">Assign</button>
       `;
