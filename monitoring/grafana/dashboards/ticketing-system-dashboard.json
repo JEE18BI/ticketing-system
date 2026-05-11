@@ -257,9 +257,9 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "ticket_status_total",
+          "expr": "sum by (status) (ticket_status_total)",
           "legendFormat": "{{status}}",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
