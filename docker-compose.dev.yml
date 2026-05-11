@@ -29,6 +29,16 @@ services:
     ports:
       - "3306:3306"
 
+  prometheus:
+    ports:
+      - "9090:9090"
+
+  grafana:
+    ports:
+      - "3000:3000"
+
 volumes:
   mysql_data:
     name: ticketing-system-dev_mysql_data
+  grafana_data:
+    name: ticketing-system-dev_grafana_data
