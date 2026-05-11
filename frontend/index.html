@@ -1,26 +1,116 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
   <title>Ticketing System</title>
- 
+  <script src="config.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+    }
+
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+
+    input {
+      padding: 10px;
+      width: 70%;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+    }
+
+    .create-btn { background: #4CAF50; color: white; }
+    .assign-btn { background: #2196F3; color: white; }
+    .close-btn { background: orange; color: white; }
+    .delete-btn { background: red; color: white; }
+
+    .ticket {
+      border-bottom: 1px solid #eee;
+      padding: 10px 0;
+    }
+
+    .status {
+      font-weight: bold;
+    }
+
+    .report {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+  </style>
 </head>
 
-<body onload="loadTickets()">
+<body onload="init()">
 
-<h1>🎫 Ticketing System</h1>
+<div class="container">
 
-<h2>Create Ticket</h2>
-<input id="title" placeholder="Enter title">
-<button onclick="createTicket()">Create</button>
+  <h1>🎫 Ticketing Dashboard</h1>
 
-<h2>Tickets</h2>
-<div id="tickets"></div>
+  <!-- Create Ticket -->
+  <div class="card">
+    <h2>Create Ticket</h2>
+    <input id="title" placeholder="Enter ticket title">
+    <button class="create-btn" onclick="createTicket()">Create</button>
+  </div>
+
+  <!-- Notifications -->
+  <div class="card">
+    <h2>🔔 Notifications</h2>
+    <div id="notifications">No notifications yet</div>
+  </div>
+
+  <!-- Tickets -->
+  <div class="card">
+    <h2>Tickets</h2>
+    <div id="tickets"></div>
+  </div>
+
+  <!-- Report -->
+  <div class="card">
+    <h2>📊 Report</h2>
+    <div id="report" class="report"></div>
+  </div>
+
+</div>
 
 <script>
 
+// docker ports
+const SUPPORT = window.API_CONFIG.SUPPORT;
+const TICKET = window.API_CONFIG.TICKET;
+const NOTIF = window.API_CONFIG.NOTIF;
+const REPORT = window.API_CONFIG.REPORT;
+
+
 const agents = ["Jana", "John", "Alice"];
 
+// Status labels
 function getStatusLabel(status) {
   if (status === "open") return "🟢 Open";
   if (status === "in_progress") return "🟡 In Progress";
@@ -28,15 +118,32 @@ function getStatusLabel(status) {
   return status;
 }
 
+// Format date
+function formatDate(date) {
+  if (!date) return "";
+  return new Date(date).toLocaleString();
+}
+
+// Init
+async function init() {
+  loadTickets();
+  loadReport();
+  loadNotifications();
+
+  setInterval(() => {
+    loadTickets();
+    loadReport();
+    loadNotifications();
+  }, 5000);
+}
+
+// Create ticket
 async function createTicket() {
   const title = document.getElementById("title").value;
 
-  if (!title) {
-    alert("Enter a title");
-    return;
-  }
+  if (!title) return alert("Enter a title");
 
-  await fetch("http://127.0.0.1:5000/create", {
+  await fetch(`${TICKET}/create`, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({title})
@@ -44,13 +151,19 @@ async function createTicket() {
 
   document.getElementById("title").value = "";
   loadTickets();
+  loadReport();
 }
 
+// Load tickets
 async function loadTickets() {
-  const res = await fetch("http://127.0.0.1:5001/get-tickets");
+  const res = await fetch(`${SUPPORT}/get-tickets`);
   const data = await res.json();
 
   const container = document.getElementById("tickets");
+  const selectedAgents = {};
+  document.querySelectorAll("select[id^='agent-']").forEach(select => {
+    selectedAgents[select.id] = select.value;
+  });
   container.innerHTML = "";
 
   data.forEach(t => {
@@ -58,31 +171,36 @@ async function loadTickets() {
     div.className = "ticket";
 
     let buttons = "";
- 
 
+    buttons += `<button class="delete-btn" onclick="deleteTicket(${t.id})">Delete</button>`;
 
-// Delete (always available)
-buttons += `<button onclick="deleteTicket(${t.id})" style="background:red;">Delete</button>`;
-
-    // 🟢 Assign if not assigned
     if (!t.assigned_to) {
       buttons += `
         <select id="agent-${t.id}">
-          ${agents.map(a => `<option value="${a}">${a}</option>`).join("")}
+          ${agents.map(a => `
+            <option value="${a}" ${selectedAgents[`agent-${t.id}`] === a ? "selected" : ""}>
+              ${a}
+            </option>
+          `).join("")}
         </select>
-        <button onclick="assign(${t.id})">Assign</button>
+        <button class="assign-btn" onclick="assign(${t.id})">Assign</button>
       `;
     }
 
-    // 🟡 Close if assigned and not closed
     if (t.assigned_to && t.status !== "closed") {
-      buttons += `<button onclick="closeTicket(${t.id})">Close</button>`;
+      buttons += `<button class="close-btn" onclick="closeTicket(${t.id})">Close</button>`;
     }
 
     div.innerHTML = `
       <strong>${t.title}</strong><br>
-      Status: ${getStatusLabel(t.status)}<br>
+      <span class="status">Status: ${getStatusLabel(t.status)}</span><br>
       Assigned to: ${t.assigned_to || "Unassigned"}<br>
+      🕒 Created: ${formatDate(t.created_at)}<br>
+      🔄 Updated: ${formatDate(t.updated_at)}<br>
+
+      <input id="msg-${t.id}" placeholder="Reply...">
+      <button onclick="respond(${t.id})">Send</button>
+
       ${buttons}
     `;
 
@@ -90,33 +208,125 @@ buttons += `<button onclick="deleteTicket(${t.id})" style="background:red;">Dele
   });
 }
 
+// Load report
+async function loadReport() {
+  try {
+    const res = await fetch(`${REPORT}/report`);
+    const data = await res.json();
+
+    if (!data || !data.status_breakdown) {
+      document.getElementById("report").innerHTML = "⚠️ No report data";
+      return;
+    }
+
+    document.getElementById("report").innerHTML = `
+      <div><strong>Total:</strong> ${data.total_tickets}</div>
+      <div><strong>Open:</strong> ${data.status_breakdown.open}</div>
+      <div><strong>In Progress:</strong> ${data.status_breakdown.in_progress}</div>
+      <div><strong>Closed:</strong> ${data.status_breakdown.closed}</div>
+      <div><strong>Top Agent:</strong> ${data.top_agent || "N/A"}</div>
+      <div><strong>Closed %:</strong> ${data.performance?.closed_percentage || 0}%</div>
+      <div><strong>Avg Time:</strong> ${data.performance?.avg_resolution_time_seconds || 0}s</div>
+    `;
+  } catch (err) {
+    document.getElementById("report").innerHTML = "⚠️ Connection issue";
+  }
+}
+
+// Load notifications
+async function loadNotifications() {
+  try {
+    const res = await fetch(`${NOTIF}/notifications`);
+    const data = await res.json();
+
+    const container = document.getElementById("notifications");
+
+    if (!data.length) {
+      container.innerHTML = "No notifications yet";
+      return;
+    }
+
+    container.innerHTML = data
+      .slice()
+      .reverse()
+      .map(n => `
+        <div style="padding:8px; border-bottom:1px solid #eee;">
+          ${formatNotification(n)}
+        </div>
+      `)
+      .join("");
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// Format notifications
+function formatNotification(n) {
+  if (n.event === "ticket_created")
+    return `🟢 Ticket created: ${n.title}`;
+
+  if (n.event === "ticket_deleted")
+    return `🔴 Ticket deleted (ID: ${n.ticket_id})`;
+
+  if (n.event === "ticket_assigned")
+    return `🟡 Ticket ${n.ticket_id} assigned to ${n.agent}`;
+
+  if (n.event === "ticket_closed")
+    return `🔵 Ticket ${n.ticket_id} closed`;
+
+  if (n.event === "ticket_response")
+    return `💬 Ticket ${n.ticket_id}: ${n.message}`;
+
+  return JSON.stringify(n);
+}
+
+// Assign
 async function assign(id) {
   const agent = document.getElementById(`agent-${id}`).value;
 
-  await fetch(`http://127.0.0.1:5001/assign/${id}`, {
+  await fetch(`${SUPPORT}/assign/${id}`, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({agent})
   });
 
   loadTickets();
+  loadReport();
 }
 
+// Close
 async function closeTicket(id) {
-  await fetch(`http://127.0.0.1:5001/close/${id}`, {
+  await fetch(`${SUPPORT}/close/${id}`, {
     method: "PUT"
   });
 
   loadTickets();
+  loadReport();
 }
-async function deleteTicket(id) {
-  if (!confirm("Are you sure you want to delete this ticket?")) return;
 
-  await fetch(`http://127.0.0.1:5001/delete/${id}`, {
+// Delete
+async function deleteTicket(id) {
+  if (!confirm("Delete this ticket?")) return;
+
+  await fetch(`${TICKET}/delete/${id}`, {
     method: "DELETE"
   });
 
   loadTickets();
+  loadReport();
+}
+
+// Respond
+async function respond(id) {
+  const message = document.getElementById(`msg-${id}`).value;
+
+  await fetch(`${SUPPORT}/respond/${id}`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({message})
+  });
+
+  loadNotifications();
 }
 
 </script>
